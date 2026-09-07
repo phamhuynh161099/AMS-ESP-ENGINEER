@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "skills": {
+    "detour-onboarding": {
+      "source": "software-mansion-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/detour/detour-onboarding/SKILL.md",
+      "computedHash": "0960be05add0bcaee602a09dc93e0c7226a1b3ada2244310fba5fd2afba74864"
+    },
+    "expo-horizon": {
+      "source": "software-mansion-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/expo-horizon/SKILL.md",
+      "computedHash": "71653dd73c51221a04a417c5fe4be1744e2a0d45e4eb2d5e98c09a5797fdb98b"
+    },
+    "fishjam": {
+      "source": "software-mansion-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/fishjam/SKILL.md",
+      "computedHash": "65bb9ac20c2ee83bc4b0b4662583fb106955761515aca115d0e8fd8f54c7f32f"
+    },
+    "migrate-to-detour": {
+      "source": "software-mansion-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/detour/migrate-to-detour/SKILL.md",
+      "computedHash": "da75de72c156e2306444652c3b4ffac2e2cd7f4452ea19b1dd6a68c8b82b7482"
+    },
+    "moq-kit": {
+      "source": "software-mansion-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/moq-kit/SKILL.md",
+      "computedHash": "f373b5030eb922042690bbbd236af4c03ae7f2113e9b0892a82d3f6805af69d8"
+    },
+    "pulsar-haptics": {
+      "source": "software-mansion-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/pulsar-haptics/SKILL.md",
+      "computedHash": "0b7accd727c8b78771245820f2df5b3b8281caf8208e7a0861183064ade2748d"
+    },
+    "radon-mcp": {
+      "source": "software-mansion-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/radon-mcp/SKILL.md",
+      "computedHash": "09ba1e44f86148ce027b04d2d580d90abcf71a36fd62d43b9dc90962c99fc90b"
+    },
+    "react-native-best-practices": {
+      "source": "software-mansion-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-native-best-practices/SKILL.md",
+      "computedHash": "51b1ba62fa02cfd34d9f532bae374c2a5f77aa5290fe9c66b92627d65a39269f"
+    },
+    "react-native-moq": {
+      "source": "software-mansion-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-native-moq/SKILL.md",
+      "computedHash": "2185e8d8f899009dca5a46588e8f562b1b2f5087bb3376f7a383b73634d27dfe"
+    },
+    "rnrepo": {
+      "source": "software-mansion-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/rnrepo/SKILL.md",
+      "computedHash": "abc4e0bfb191a75c289184ccd53b6219c5fe10f1835f68d33b38ca385ef45afe"
+    },
+    "typegpu": {
+      "source": "software-mansion-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/typegpu/SKILL.md",
+      "computedHash": "4c2fdd6971b78c6fe34b5f73eafc2af5134d51271a3de635f38835a0d99155e3"
+    }
+  }
+}
