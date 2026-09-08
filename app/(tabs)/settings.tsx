@@ -25,6 +25,9 @@ export default function SettingsScreen() {
     scheduleBackgroundTest,
     isBackgroundDutyEnabled,
     toggleBackgroundDuty,
+    sendTestNotification,
+    openBatterySettings,
+    isBackgroundServiceRunning,
   } = useEngineer();
 
   const [isScheduled, setIsScheduled] = useState(false);
@@ -78,6 +81,29 @@ export default function SettingsScreen() {
       'Hãy bấm phím HOME để thoát app hoặc bấm nút nguồn để KHÓA MÀN HÌNH ngay bây giờ!\n\nSau 5 giây, điện thoại sẽ tự động đổ chuông và hiện thông báo khẩn cấp lên màn hình khóa.'
     );
     setTimeout(() => setIsScheduled(false), 6000);
+  };
+
+  const handleTestForegroundNotification = async () => {
+    try {
+      await sendTestNotification({
+        machineName: 'Máy Dập Thủy Lực #01',
+        location: 'Khu A - Gian máy 03',
+      });
+      Alert.alert('Thông báo đã gửi', 'Đã gửi thông báo khẩn qua Foreground Service. Thử khoá màn hình!');
+    } catch (e) {
+      Alert.alert('Lỗi', 'Không gửi được thông báo. Kiểm tra quyền POST_NOTIFICATIONS.');
+    }
+  };
+
+  const handleOpenBatterySettings = async () => {
+    try {
+      await openBatterySettings();
+    } catch {
+      Alert.alert(
+        'Cài đặt pin',
+        'Vui lòng vào Cài đặt > Ứng dụng > ESP Engineer > Pin\nvà chọn "Không giới hạn" để app chạy ổn định khi khoá màn hình.'
+      );
+    }
   };
 
   return (
@@ -289,6 +315,32 @@ export default function SettingsScreen() {
                 ? 'ĐÃ HẸN GIỜ (5S) — HÃY KHOÁ MÀN HÌNH ĐIỆN THOẠI NGAY!'
                 : 'THỬ NGHIỆM BÁO ĐỘNG KHI KHOÁ MÀN HÌNH (HẸN GIỜ 5S)'}
             </Text>
+          </TouchableOpacity>
+
+          {/* Service Status */}
+          <View style={styles.serviceStatusRow}>
+            <View style={[styles.serviceIndicator, isBackgroundServiceRunning && styles.serviceIndicatorActive]} />
+            <Text style={styles.serviceStatusText}>
+              {isBackgroundServiceRunning ? 'Foreground Service: ĐANG CHẠY' : 'Foreground Service: DỪNG'}
+            </Text>
+          </View>
+
+          {/* Foreground Service Test Button */}
+          <TouchableOpacity
+            style={styles.testFgBtn}
+            onPress={handleTestForegroundNotification}
+            activeOpacity={0.8}>
+            <Ionicons name="notifications" size={16} color="#38bdf8" />
+            <Text style={styles.testFgBtnText}>GỬI THÔNG BÁO NGAY (Test Foreground)</Text>
+          </TouchableOpacity>
+
+          {/* Battery Optimization Settings */}
+          <TouchableOpacity
+            style={styles.batteryBtn}
+            onPress={handleOpenBatterySettings}
+            activeOpacity={0.8}>
+            <Ionicons name="battery-charging" size={16} color="#10b981" />
+            <Text style={styles.batteryBtnText}>Mở cài đặt tối ưu pin (Bỏ giới hạn nền)</Text>
           </TouchableOpacity>
         </View>
 
@@ -731,6 +783,61 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 4,
+  },
+  serviceStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  serviceIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#475569',
+  },
+  serviceIndicatorActive: {
+    backgroundColor: '#10b981',
+  },
+  serviceStatusText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94a3b8',
+  },
+  testFgBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(56, 189, 248, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.3)',
+    borderRadius: 8,
+    paddingVertical: 10,
+    marginTop: 8,
+  },
+  testFgBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#38bdf8',
+  },
+  batteryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderRadius: 8,
+    paddingVertical: 10,
+    marginTop: 8,
+  },
+  batteryBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#10b981',
   },
   testBgBtnActive: {
     backgroundColor: '#b91c1c',

@@ -31,6 +31,14 @@ import {
   dismissEmergencyNotification,
   setDutyNotification,
 } from '@/services/notifications';
+import {
+  startBackgroundPolling,
+  stopBackgroundPolling,
+  sendTestNotification,
+  openBatterySettings,
+  setupBackgroundChannels,
+} from '@/services/backgroundPolling';
+import { setBackgroundDutyEnabled, isBackgroundDutyEnabled as readDutyPreference } from '@/services/dutyPreference';
 
 const STORAGE_KEY_CONFIG = '@esp_engineer_config_v2';
 const STORAGE_KEY_LOGS = '@esp_engineer_logs_v1';
@@ -89,6 +97,11 @@ interface EngineerContextValue {
   clearLogs: () => Promise<void>;
   scheduleBackgroundTest: (delaySeconds?: number) => Promise<void>;
   toggleBackgroundDuty: () => void;
+  startBackgroundPolling: () => Promise<void>;
+  stopBackgroundPolling: () => Promise<void>;
+  sendTestNotification: (info?: { machineName?: string; location?: string }) => Promise<void>;
+  openBatterySettings: () => Promise<void>;
+  isBackgroundServiceRunning: boolean;
 
   // Simulation / Testing tools
   triggerSimulatedTicket: (customTicket?: Partial<TicketInfo>) => void;
@@ -115,6 +128,7 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isAlarmActive, setIsAlarmActive] = useState<boolean>(false);
   const [pushToken, setPushToken] = useState<string | null>(null);
   const [isBackgroundDutyEnabled, setIsBackgroundDutyEnabled] = useState<boolean>(true);
+  const [isBackgroundServiceRunning, setIsBackgroundServiceRunning] = useState<boolean>(false);
   const [transitionState, setTransitionState] = useState<TransitionScreenState>({
     isActive: false,
     title: '',
@@ -167,6 +181,13 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
         const savedLogs = await AsyncStorage.getItem(STORAGE_KEY_LOGS);
         if (savedLogs) {
           setLogs(JSON.parse(savedLogs));
+        }
+
+        // Restore background duty preference and auto-start service if it was enabled
+        const wasEnabled = await readDutyPreference();
+        if (wasEnabled) {
+          setIsBackgroundDutyEnabled(true);
+          // Service will start via the useEffect below that watches isBackgroundDutyEnabled
         }
       } catch (err) {
         console.warn('Lỗi khi tải cấu hình:', err);
@@ -407,8 +428,8 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
       return true;
     }
 
-    const { serverBaseUrl } = configRef.current;
-    const res = await acknowledgeTicket(serverBaseUrl, ticket.id);
+    const { serverBaseUrl, macAddress } = configRef.current;
+    const res = await acknowledgeTicket(serverBaseUrl, ticket.id, macAddress);
 
     setIsAcknowledging(false);
 
@@ -471,21 +492,56 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
     silenceAlarm,
   ]);
 
-  // Toggle background duty mode
+  // Toggle background duty mode — state change triggers the useEffect that manages the service
   const toggleBackgroundDuty = useCallback(() => {
-    setIsBackgroundDutyEnabled((prev) => {
-      const next = !prev;
-      addLog(
-        'INFO',
-        next
-          ? 'Đã BẬT Chế độ trực ca chạy ngầm (Sẵn sàng nhận việc khi khoá màn hình)'
-          : 'Đã TẮT Chế độ trực ca chạy ngầm'
-      );
-      return next;
-    });
-  }, [addLog]);
+    const next = !isBackgroundDutyEnabled;
+    setIsBackgroundDutyEnabled(next);
+    addLog(
+      'INFO',
+      next
+        ? 'Bật chế độ trực ca ngầm (Foreground Service)'
+        : 'Tắt chế độ trực ca ngầm',
+    );
+  }, [isBackgroundDutyEnabled, addLog]);
 
-  // Sync duty status notification with engineer assignment and duty toggle
+  // Sync foreground service lifecycle with isBackgroundDutyEnabled
+  useEffect(() => {
+    let cancelled = false;
+
+    if (isBackgroundDutyEnabled) {
+      (async () => {
+        try {
+          await setupBackgroundChannels();
+          await startBackgroundPolling(
+            configRef.current.serverBaseUrl,
+            configRef.current.engineerId,
+          );
+          if (cancelled) return;
+          setIsBackgroundServiceRunning(true);
+          await setBackgroundDutyEnabled(true); // persist for BootReceiver
+          addLog('INFO', 'Foreground Service trực ca đã khởi động');
+        } catch (e) {
+          if (cancelled) return;
+          setIsBackgroundDutyEnabled(false);
+          setIsBackgroundServiceRunning(false);
+          addLog('ERROR', `Foreground Service khởi động thất bại: ${e}`);
+        }
+      })();
+    } else {
+      (async () => {
+        await stopBackgroundPolling();
+        if (cancelled) return;
+        setIsBackgroundServiceRunning(false);
+        await setBackgroundDutyEnabled(false); // persist for BootReceiver
+        addLog('INFO', 'Foreground Service trực ca đã dừng');
+      })();
+    }
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBackgroundDutyEnabled]);
+
+  // Sync expo-notifications duty status (in-app display only)
   useEffect(() => {
     if (isBackgroundDutyEnabled) {
       setDutyNotification(true, {
@@ -613,12 +669,24 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
         isAlarmActive,
         pushToken,
         isBackgroundDutyEnabled,
+        isBackgroundServiceRunning,
         updateConfig,
         acknowledgeCurrentTicket,
         manualRefresh,
         clearLogs,
         scheduleBackgroundTest,
         toggleBackgroundDuty,
+        startBackgroundPolling: async () => {
+          await setupBackgroundChannels().catch(() => {});
+          await startBackgroundPolling(configRef.current.serverBaseUrl, configRef.current.engineerId);
+          setIsBackgroundServiceRunning(true);
+        },
+        stopBackgroundPolling: async () => {
+          await stopBackgroundPolling();
+          setIsBackgroundServiceRunning(false);
+        },
+        sendTestNotification,
+        openBatterySettings,
         triggerSimulatedTicket,
         simulateAcknowledge,
         simulateLineUserComplete,

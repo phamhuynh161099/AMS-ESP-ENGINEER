@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "com.ams.espengineer",
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -26,9 +27,13 @@
         "android.permission.WAKE_LOCK",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+        "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.USE_FULL_SCREEN_INTENT",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
       ],
-      "usesCleartextTraffic": true,
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
@@ -56,6 +61,17 @@
         {
           "icon": "./assets/images/icon.png",
           "color": "#0284c7"
+        }
+      ],
+      "expo-asset",
+      [
+        "@felipe-software/react-native-notify-kit",
+        {
+          "android": {
+            "foregroundService": {
+              "types": ["dataSync"]
+            }
+          }
         }
       ]
     ],
