@@ -90,20 +90,36 @@ export default function SettingsScreen() {
         location: 'Khu A - Gian máy 03',
       });
       Alert.alert('Thông báo đã gửi', 'Đã gửi thông báo khẩn qua Foreground Service. Thử khoá màn hình!');
-    } catch (e) {
+    } catch {
       Alert.alert('Lỗi', 'Không gửi được thông báo. Kiểm tra quyền POST_NOTIFICATIONS.');
     }
   };
 
   const handleOpenBatterySettings = async () => {
-    try {
-      await openBatterySettings();
-    } catch {
-      Alert.alert(
-        'Cài đặt pin',
-        'Vui lòng vào Cài đặt > Ứng dụng > ESP Engineer > Pin\nvà chọn "Không giới hạn" để app chạy ổn định khi khoá màn hình.'
-      );
-    }
+    Alert.alert(
+      'Hướng Dẫn Tối Ưu Pin Android',
+      'Để ứng dụng nhận thông báo sự cố liên tục khi khoá màn hình:\n\n' +
+      '1. Chọn "Không hạn chế" (Unrestricted) trong mục Pin.\n' +
+      '2. (Xiaomi / Oppo / Vivo): Bật thêm "Tự khởi chạy" (Autostart).\n' +
+      '3. Khóa biểu tượng app trong màn hình Đa nhiệm (Recent Apps).\n\n' +
+      'Bấm "Mở Cài Đặt Pin" để thiết lập ngay.',
+      [
+        { text: 'Đóng', style: 'cancel' },
+        {
+          text: 'Mở Cài Đặt Pin',
+          onPress: async () => {
+            try {
+              await openBatterySettings();
+            } catch {
+              Alert.alert(
+                'Cài đặt pin',
+                'Vui lòng vào Cài đặt máy > Ứng dụng > ESP Engineer > Pin\nvà chọn "Không giới hạn" để app chạy ổn định khi khoá màn hình.'
+              );
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -342,6 +358,19 @@ export default function SettingsScreen() {
             <Ionicons name="battery-charging" size={16} color="#10b981" />
             <Text style={styles.batteryBtnText}>Mở cài đặt tối ưu pin (Bỏ giới hạn nền)</Text>
           </TouchableOpacity>
+
+          {/* Battery Guidance Tip Box */}
+          <View style={styles.batteryTipBox}>
+            <View style={styles.batteryTipHeader}>
+              <Ionicons name="information-circle" size={15} color="#38bdf8" />
+              <Text style={styles.batteryTipTitle}>LƯU Ý KHOÁ MÀN HÌNH (XIAOMI / SAMSUNG / OPPO)</Text>
+            </View>
+            <Text style={styles.batteryTipDesc}>
+              • Pin: Chọn chế độ <Text style={styles.boldWhite}>&quot;Không hạn chế&quot;</Text> (Unrestricted).{'\n'}
+              • Xiaomi / Oppo: Bật <Text style={styles.boldWhite}>&quot;Tự khởi chạy&quot;</Text> (Autostart).{'\n'}
+              • Đa nhiệm: Nhấn giữ / vuốt icon app và chọn <Text style={styles.boldWhite}>Ổ khóa</Text> để app không bị tắt khi tắt màn hình lâu.
+            </Text>
+          </View>
         </View>
 
         {/* Section 3: Simulation & Testing Suite */}
@@ -848,5 +877,34 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     letterSpacing: 0.5,
     textAlign: 'center',
+  },
+  batteryTipBox: {
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.25)',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 10,
+  },
+  batteryTipHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  batteryTipTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#38bdf8',
+    letterSpacing: 0.5,
+  },
+  batteryTipDesc: {
+    fontSize: 11,
+    color: '#94a3b8',
+    lineHeight: 18,
+  },
+  boldWhite: {
+    color: '#f8fafc',
+    fontWeight: '700',
   },
 });

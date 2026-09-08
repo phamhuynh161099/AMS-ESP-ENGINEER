@@ -558,6 +558,14 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       console.log('[AppState Change]:', nextAppState);
       if (nextAppState === 'active') {
+        // Sync duty preference in case it was toggled via notification action
+        readDutyPreference()
+          .then((enabled) => {
+            setIsBackgroundDutyEnabled(enabled);
+            setIsBackgroundServiceRunning(enabled);
+          })
+          .catch(() => {});
+
         // Immediately fetch data on unlock / focus
         checkRequests();
         if (stateRef.current === 'IDLE') {

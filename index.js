@@ -1,6 +1,10 @@
 import 'react-native-reanimated';
 import notifee, { EventType } from '@felipe-software/react-native-notify-kit';
 import App from 'expo-router/entry';
+import {
+  runForegroundPollingTask,
+  stopBackgroundPolling,
+} from './services/backgroundPolling';
 
 // ---------------------------------------------------------------------------
 // Background + killed-state event handler
@@ -12,9 +16,15 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
   } else if (type === EventType.ACTION_PRESS) {
     console.log('[NotifyKit-bg] Action pressed:', detail.pressAction?.id);
     if (detail.pressAction?.id === 'stop_foreground') {
-      await notifee.stopForegroundService();
+      await stopBackgroundPolling();
     }
   }
 });
+
+// ---------------------------------------------------------------------------
+// Register Foreground Service task at top-level (outside React lifecycle)
+// Required by Notifee / Android so polling runs reliably even if JS was restarted
+// ---------------------------------------------------------------------------
+notifee.registerForegroundService((notification) => runForegroundPollingTask());
 
 export default App;

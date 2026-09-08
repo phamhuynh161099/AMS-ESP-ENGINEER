@@ -1,11 +1,12 @@
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import notifee, {
   AndroidImportance,
   AndroidVisibility,
   AndroidCategory,
-  EventType,
 } from '@felipe-software/react-native-notify-kit';
 import { checkPendingRequests } from './api';
+import { setBackgroundDutyEnabled } from './dutyPreference';
 
 // ---------------------------------------------------------------------------
 // Channel IDs
@@ -14,6 +15,20 @@ export const CHANNEL_REALTIME = 'realtime-alert';
 export const CHANNEL_DUTY     = 'duty-status';
 
 const SOUND_ALERT = 'alert_sound'; // falls back to default if file missing
+
+interface PollingParams {
+  baseUrl: string;
+  engineerId: string;
+  pollIntervalMs: number;
+}
+
+const STORAGE_KEY_CONFIG = '@esp_engineer_config_v2';
+const DEFAULT_BASE_URL = 'http://10.101.1.193:8080/espRecieve';
+const DEFAULT_ENGINEER_ID = '12';
+
+let currentParams: PollingParams | null = null;
+let isRunning = false;
+let stopTaskCallback: (() => void) | null = null;
 
 // ---------------------------------------------------------------------------
 // Setup notification channels — call once on app start.
@@ -56,6 +71,38 @@ function hasNewTicket(ticketId: string | undefined): boolean {
   if (ticketId === lastSeenTicketId) return false;
   lastSeenTicketId = ticketId;
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Helper to restore config if JS instance restarted in background
+// ---------------------------------------------------------------------------
+async function getOrRestoreParams(): Promise<PollingParams | null> {
+  if (currentParams) return currentParams;
+
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_KEY_CONFIG);
+    if (raw) {
+      const cfg = JSON.parse(raw);
+      if (cfg.simulationMode) {
+        return null;
+      }
+      currentParams = {
+        baseUrl: cfg.serverBaseUrl || DEFAULT_BASE_URL,
+        engineerId: cfg.engineerId || DEFAULT_ENGINEER_ID,
+        pollIntervalMs: 15_000,
+      };
+      return currentParams;
+    }
+  } catch (e) {
+    console.warn('[BG-Poll] Lỗi khi khôi phục cấu hình từ AsyncStorage:', e);
+  }
+
+  currentParams = {
+    baseUrl: DEFAULT_BASE_URL,
+    engineerId: DEFAULT_ENGINEER_ID,
+    pollIntervalMs: 15_000,
+  };
+  return currentParams;
 }
 
 // ---------------------------------------------------------------------------
@@ -103,19 +150,66 @@ async function pollAndAlert(
 }
 
 // ---------------------------------------------------------------------------
-// Start the foreground service that polls in background
+// Foreground service task — registered in index.js at top-level
+// Returns a Promise that keeps the service alive while isRunning is true
+// ---------------------------------------------------------------------------
+export function runForegroundPollingTask(): Promise<void> {
+  return new Promise<void>(async (resolve) => {
+    if (stopTaskCallback) {
+      stopTaskCallback();
+    }
+
+    isRunning = true;
+    stopTaskCallback = () => {
+      isRunning = false;
+      resolve();
+    };
+
+    console.log('[BG-Poll] Foreground service loop started');
+
+    while (isRunning) {
+      const params = await getOrRestoreParams();
+
+      if (params && isRunning) {
+        try {
+          await pollAndAlert(params.baseUrl, params.engineerId);
+        } catch (e) {
+          console.warn('[BG-Poll] pollAndAlert cycle error:', e);
+        }
+      }
+
+      if (!isRunning) break;
+
+      const interval = params?.pollIntervalMs ?? 15_000;
+      await new Promise<void>((r) => {
+        const timer = setTimeout(r, interval);
+        const prevStop = stopTaskCallback;
+        stopTaskCallback = () => {
+          clearTimeout(timer);
+          r();
+          if (prevStop) prevStop();
+        };
+      });
+    }
+
+    console.log('[BG-Poll] Foreground service loop finished');
+    resolve();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Start foreground polling — displays persistent notification
 // ---------------------------------------------------------------------------
 export async function startBackgroundPolling(
   baseUrl: string,
   engineerId: string,
   pollIntervalMs = 15_000,
 ): Promise<void> {
-  // If already running, stop it first
-  await stopBackgroundPolling();
+  currentParams = { baseUrl, engineerId, pollIntervalMs };
 
   await setupBackgroundChannels();
 
-  // Ongoing notification — user can't swipe away
+  // Ongoing notification — user can tap to open app or tap action to stop
   await notifee.displayNotification({
     title:   '🔄 Đang đồng bộ dữ liệu',
     body:    'Ứng dụng đang chạy nền • Sẵn sàng nhận sự cố',
@@ -123,26 +217,14 @@ export async function startBackgroundPolling(
       channelId: CHANNEL_DUTY,
       asForegroundService: true,
       ongoing: true,
-      pressAction: { id: 'stop_foreground' },
+      pressAction: { id: 'default' },
+      actions: [
+        {
+          title: 'Dừng trực ca',
+          pressAction: { id: 'stop_foreground' },
+        },
+      ],
     },
-  });
-
-  // Register + launch the foreground service
-  notifee.registerForegroundService(async (notification) => {
-    let running = true;
-
-    // Handle stop action
-    notifee.onBackgroundEvent(async ({ type, detail }) => {
-      if (type === EventType.ACTION_PRESS && detail.pressAction?.id === 'stop_foreground') {
-        running = false;
-        await notifee.stopForegroundService();
-      }
-    });
-
-    while (running) {
-      await pollAndAlert(baseUrl, engineerId);
-      await new Promise<void>((resolve) => setTimeout(resolve, pollIntervalMs));
-    }
   });
 }
 
@@ -150,9 +232,21 @@ export async function startBackgroundPolling(
 // Stop foreground service
 // ---------------------------------------------------------------------------
 export async function stopBackgroundPolling(): Promise<void> {
+  isRunning = false;
+  currentParams = null;
+  lastSeenTicketId = null;
+
+  if (stopTaskCallback) {
+    stopTaskCallback();
+    stopTaskCallback = null;
+  }
+
+  try {
+    await setBackgroundDutyEnabled(false);
+  } catch {}
+
   try {
     await notifee.stopForegroundService();
-    lastSeenTicketId = null;
   } catch {
     // Ignore — service may not be running
   }
