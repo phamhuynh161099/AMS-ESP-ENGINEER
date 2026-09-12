@@ -19,7 +19,6 @@ export const TicketCard: React.FC = () => {
     acknowledgeError,
     acknowledgeCurrentTicket,
     isAlarmActive,
-    triggerSimulatedTicket,
   } = useEngineer();
 
   // Pulse animation for REQUEST_RECEIVED
@@ -74,15 +73,6 @@ export const TicketCard: React.FC = () => {
               : 'Chưa được phân công chuyền nào'}
           </Text>
         </View>
-
-        {/* Quick Demo button */}
-        <TouchableOpacity
-          style={styles.quickDemoBtn}
-          onPress={() => triggerSimulatedTicket()}
-          activeOpacity={0.8}>
-          <MaterialCommunityIcons name="bell-ring-outline" size={18} color="#38bdf8" />
-          <Text style={styles.quickDemoText}>Thử nghiệm mô phỏng gọi kỹ sư</Text>
-        </TouchableOpacity>
       </View>
     );
   }
@@ -312,11 +302,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 16,
     paddingVertical: 10,
-  },
-  quickDemoText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#38bdf8',
   },
 
   // REQUEST_RECEIVED State

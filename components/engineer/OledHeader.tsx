@@ -98,12 +98,6 @@ export const OledHeader: React.FC = () => {
                 {isBackgroundDutyEnabled ? 'TRỰC CA NGẦM' : 'TẮT TRỰC'}
               </Text>
             </View>
-
-            {config.simulationMode && (
-              <View style={styles.demoPill}>
-                <Text style={styles.demoPillText}>TEST</Text>
-              </View>
-            )}
           </View>
         </View>
 

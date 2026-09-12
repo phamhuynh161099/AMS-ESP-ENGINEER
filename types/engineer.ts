@@ -38,7 +38,6 @@ export interface ServerConfig {
   vibrationEnabled: boolean;
   pollIntervalRequests: number; // ms, default 3000
   pollIntervalInfo: number; // ms, default 30000
-  simulationMode: boolean;
 }
 
 export interface ActivityLog {

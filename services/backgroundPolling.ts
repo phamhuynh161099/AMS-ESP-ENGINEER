@@ -83,9 +83,6 @@ async function getOrRestoreParams(): Promise<PollingParams | null> {
     const raw = await AsyncStorage.getItem(STORAGE_KEY_CONFIG);
     if (raw) {
       const cfg = JSON.parse(raw);
-      if (cfg.simulationMode) {
-        return null;
-      }
       currentParams = {
         baseUrl: cfg.serverBaseUrl || DEFAULT_BASE_URL,
         engineerId: cfg.engineerId || DEFAULT_ENGINEER_ID,

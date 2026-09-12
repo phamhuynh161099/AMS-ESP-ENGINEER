@@ -6,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { AppState, AppStateStatus, Platform } from 'react-native';
+import { AppState, AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActivityLog,
@@ -26,7 +26,6 @@ import {
 import * as Notifications from 'expo-notifications';
 import {
   registerForPushNotificationsAsync,
-  scheduleTestEmergencyNotification,
   sendEmergencyNotification,
   dismissEmergencyNotification,
   setDutyNotification,
@@ -51,7 +50,6 @@ const DEFAULT_CONFIG: ServerConfig = {
   vibrationEnabled: true,
   pollIntervalRequests: 3000,
   pollIntervalInfo: 30000,
-  simulationMode: false,
 };
 
 const INITIAL_ENGINEER: EngineerInfo = {
@@ -95,20 +93,12 @@ interface EngineerContextValue {
   acknowledgeCurrentTicket: () => Promise<boolean>;
   manualRefresh: () => Promise<void>;
   clearLogs: () => Promise<void>;
-  scheduleBackgroundTest: (delaySeconds?: number) => Promise<void>;
   toggleBackgroundDuty: () => void;
   startBackgroundPolling: () => Promise<void>;
   stopBackgroundPolling: () => Promise<void>;
   sendTestNotification: (info?: { machineName?: string; location?: string }) => Promise<void>;
   openBatterySettings: () => Promise<void>;
   isBackgroundServiceRunning: boolean;
-
-  // Simulation / Testing tools
-  triggerSimulatedTicket: (customTicket?: Partial<TicketInfo>) => void;
-  simulateAcknowledge: () => Promise<boolean>;
-  simulateLineUserComplete: () => void;
-  simulateTicketCancel: () => void;
-  simulateToggleNetwork: () => void;
 }
 
 const EngineerContext = createContext<EngineerContextValue | null>(null);
@@ -213,21 +203,6 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, [addLog]);
 
-  // Schedule background notification test
-  const scheduleBackgroundTest = useCallback(
-    async (delaySeconds = 5) => {
-      await scheduleTestEmergencyNotification(delaySeconds, {
-        machineName: currentTicketRef.current.machineName || 'Chuyền us #11',
-        location: currentTicketRef.current.location || 'Location us #11',
-      });
-      addLog(
-        'INFO',
-        `Đã hẹn thông báo sau ${delaySeconds}s (hãy thử khoá màn hình hoặc thoát app)`
-      );
-    },
-    [addLog]
-  );
-
   // Save config helper
   const updateConfig = useCallback(async (newConfig: Partial<ServerConfig>) => {
     setConfig((prev) => {
@@ -293,12 +268,6 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Fetch engineer info
   const fetchEngineer = useCallback(async () => {
-    if (configRef.current.simulationMode) {
-      setConnectionStatus('CONNECTED');
-      setConnectionMessage('Đang chạy ở chế độ giả lập (Simulation Mode)');
-      return;
-    }
-
     const { serverBaseUrl, macAddress } = configRef.current;
     const res = await getEngineerInfoByMac(serverBaseUrl, macAddress);
 
@@ -323,8 +292,6 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Polling checkPendingRequests (matches ESP8266 checkPendingRequests)
   const checkRequests = useCallback(async () => {
-    if (configRef.current.simulationMode) return;
-
     // Use configured engineerId or detected engineer ID (defaults to '12')
     const engId = configRef.current.engineerId || engineerInfoRef.current.id || '12';
     if (!engId) return;
@@ -412,21 +379,6 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
     setAcknowledgeError(null);
     silenceAlarm();
     dismissEmergencyNotification().catch(() => {});
-
-    if (configRef.current.simulationMode) {
-      // Simulated acknowledge
-      await new Promise((r) => setTimeout(r, 600));
-      setState('ACKNOWLEDGED');
-      setCurrentTicket((prev) => ({
-        ...prev,
-        status: 'ACKNOWLEDGED',
-        acknowledgedAt: Date.now(),
-      }));
-      triggerSuccessBeeps();
-      setIsAcknowledging(false);
-      addLog('ACK', `[MÔ PHỎNG] ĐÃ NHẬN VIỆC: ${ticket.machineName}`, ticket.location);
-      return true;
-    }
 
     const { serverBaseUrl, macAddress } = configRef.current;
     const res = await acknowledgeTicket(serverBaseUrl, ticket.id, macAddress);
@@ -586,81 +538,6 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, [checkRequests, fetchEngineer, isBackgroundDutyEnabled]);
 
-  // SIMULATION METHODS
-  const triggerSimulatedTicket = useCallback(
-    (customTicket?: Partial<TicketInfo>) => {
-      const demoTicket: TicketInfo = {
-        id: `DEMO_${Date.now()}`,
-        machineCode: customTicket?.machineCode || 'LINE_05',
-        machineName: customTicket?.machineName || 'Máy Dập Khuôn Thủy Lực #05',
-        location: customTicket?.location || 'Phân xưởng A - Khu Cột D12',
-        description:
-          customTicket?.description ||
-          'Kẹt phôi cơ cấu đẩy, nhiệt độ dầu thủy lực vượt ngưỡng cho phép 85°C.',
-        status: 'REQUESTED',
-        receivedAt: Date.now(),
-      };
-
-      setCurrentTicket(demoTicket);
-      setState('REQUEST_RECEIVED');
-      setAcknowledgeError(null);
-      triggerAlarm();
-      sendEmergencyNotification(demoTicket).catch((e) =>
-        console.log('[Emergency Notif Error]:', e?.message)
-      );
-      addLog(
-        'REQUEST',
-        `[MÔ PHỎNG] Báo động sự cố: ${demoTicket.machineName}`,
-        demoTicket.description
-      );
-    },
-    [addLog, triggerAlarm]
-  );
-
-  const simulateAcknowledge = useCallback(async (): Promise<boolean> => {
-    return acknowledgeCurrentTicket();
-  }, [acknowledgeCurrentTicket]);
-
-  const simulateLineUserComplete = useCallback(() => {
-    if (stateRef.current !== 'ACKNOWLEDGED') return;
-
-    const finished = currentTicketRef.current;
-    silenceAlarm();
-    dismissEmergencyNotification().catch(() => {});
-    setState('IDLE');
-    setCurrentTicket(INITIAL_TICKET);
-    setTransition(
-      'E.SUCCESS',
-      'Người dùng tại chuyền đã xác nhận xong việc',
-      'Sau 4s sẽ hiện thông tin bình thường'
-    );
-    addLog('SUCCESS', `[MÔ PHỎNG] Chuyền xác nhận hoàn thành: ${finished.machineName}`);
-  }, [addLog, setTransition, silenceAlarm]);
-
-  const simulateTicketCancel = useCallback(() => {
-    silenceAlarm();
-    dismissEmergencyNotification().catch(() => {});
-    setState('IDLE');
-    setCurrentTicket(INITIAL_TICKET);
-    setTransition('RESET', 'Yêu cầu sự cố đã bị huỷ', 'Sau 4s sẽ phục hồi');
-    addLog('INFO', '[MÔ PHỎNG] Ticket đã được huỷ');
-  }, [addLog, setTransition, silenceAlarm]);
-
-  const simulateToggleNetwork = useCallback(() => {
-    setConnectionStatus((prev) => {
-      if (prev === 'CONNECTED') {
-        silenceAlarm();
-        addLog('NETWORK', '[MÔ PHỎNG] Mất kết nối mạng');
-        setConnectionMessage('Mất kết nối với máy chủ xưởng');
-        return 'DISCONNECTED';
-      } else {
-        addLog('NETWORK', '[MÔ PHỎNG] Đã khôi phục kết nối mạng');
-        setConnectionMessage('Đã kết nối lại bình thường');
-        return 'CONNECTED';
-      }
-    });
-  }, [addLog, silenceAlarm]);
-
   return (
     <EngineerContext.Provider
       value={{
@@ -682,7 +559,6 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
         acknowledgeCurrentTicket,
         manualRefresh,
         clearLogs,
-        scheduleBackgroundTest,
         toggleBackgroundDuty,
         startBackgroundPolling: async () => {
           await setupBackgroundChannels().catch(() => {});
@@ -695,11 +571,6 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
         },
         sendTestNotification,
         openBatterySettings,
-        triggerSimulatedTicket,
-        simulateAcknowledge,
-        simulateLineUserComplete,
-        simulateTicketCancel,
-        simulateToggleNetwork,
       }}>
       {children}
     </EngineerContext.Provider>

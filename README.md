@@ -52,3 +52,4 @@ Join our community of developers creating universal apps.
 
 Realse APK Android
 npx expo run:android --variant release
+Sau lần build đầu tiên, những lần sau bạn chỉ cần cắm cáp, gõ adb reverse tcp:8081 tcp:8081 và chạy npx expo start, sau đó mở app đã cài sẵn trên màn hình TC21 là có thể test ngay mà không cần build lại.

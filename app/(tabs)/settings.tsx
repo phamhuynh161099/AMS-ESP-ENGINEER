@@ -13,24 +13,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEngineer } from '@/context/EngineerContext';
-import { alarmService } from '@/services/alarm';
 
 export default function SettingsScreen() {
   const {
     config,
     updateConfig,
-    triggerSimulatedTicket,
-    simulateToggleNetwork,
     connectionStatus,
-    scheduleBackgroundTest,
     isBackgroundDutyEnabled,
     toggleBackgroundDuty,
     sendTestNotification,
     openBatterySettings,
     isBackgroundServiceRunning,
   } = useEngineer();
-
-  const [isScheduled, setIsScheduled] = useState(false);
 
   const [baseUrl, setBaseUrl] = useState(config.serverBaseUrl);
   const [engId, setEngId] = useState(config.engineerId || '12');
@@ -62,34 +56,13 @@ export default function SettingsScreen() {
     Alert.alert('Thành công', 'Đã khôi phục cài đặt mặc định!');
   };
 
-  const handleTestBuzzer = () => {
-    alarmService.playBeep(3136, 500);
-  };
-
-  const handleTest3Beeps = () => {
-    alarmService.ringSuccessBeep({
-      soundEnabled: config.soundEnabled,
-      vibrationEnabled: config.vibrationEnabled,
-    });
-  };
-
-  const handleTestNotification = async () => {
-    await scheduleBackgroundTest(5);
-    setIsScheduled(true);
-    Alert.alert(
-      'Đã hẹn giờ báo động (5 giây)',
-      'Hãy bấm phím HOME để thoát app hoặc bấm nút nguồn để KHÓA MÀN HÌNH ngay bây giờ!\n\nSau 5 giây, điện thoại sẽ tự động đổ chuông và hiện thông báo khẩn cấp lên màn hình khóa.'
-    );
-    setTimeout(() => setIsScheduled(false), 6000);
-  };
-
-  const handleTestForegroundNotification = async () => {
+  const handleTestAlarm = async () => {
     try {
       await sendTestNotification({
         machineName: 'Máy Dập Thủy Lực #01',
         location: 'Khu A - Gian máy 03',
       });
-      Alert.alert('Thông báo đã gửi', 'Đã gửi thông báo khẩn qua Foreground Service. Thử khoá màn hình!');
+      Alert.alert('Thông báo đã gửi', 'Đã gửi thông báo khẩn qua Foreground Service.');
     } catch {
       Alert.alert('Lỗi', 'Không gửi được thông báo. Kiểm tra quyền POST_NOTIFICATIONS.');
     }
@@ -126,11 +99,10 @@ export default function SettingsScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
 
-      {/* Header */}
       <View style={styles.header}>
         <View>
           <Text style={styles.headerSubtitle}>HỆ THỐNG CÔNG NGHIỆP</Text>
-          <Text style={styles.headerTitle}>Cài Đặt & Giả Lập</Text>
+          <Text style={styles.headerTitle}>Cài Đặt</Text>
         </View>
       </View>
 
@@ -255,28 +227,9 @@ export default function SettingsScreen() {
               thumbColor={config.vibrationEnabled ? '#38bdf8' : '#64748b'}
             />
           </View>
-
-          {/* Test Buttons */}
-          <View style={styles.testAudioRow}>
-            <TouchableOpacity
-              style={styles.testBtn}
-              onPress={handleTestBuzzer}
-              activeOpacity={0.8}>
-              <Ionicons name="volume-high" size={16} color="#f59e0b" />
-              <Text style={styles.testBtnText}>Thử tiếng còi</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.testBtn}
-              onPress={handleTest3Beeps}
-              activeOpacity={0.8}>
-              <MaterialCommunityIcons name="music-note" size={16} color="#10b981" />
-              <Text style={styles.testBtnText}>Thử 3 bíp nhận việc</Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
-        {/* Section 2.5: Background Notifications & Phone Sleep Alarm */}
+        {/* Section 3: Background Duty Mode */}
         <View style={[styles.sectionCard, { borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.04)' }]}>
           <View style={styles.sectionHeader}>
             <MaterialCommunityIcons name="shield-check" size={20} color="#10b981" />
@@ -316,23 +269,6 @@ export default function SettingsScreen() {
             </View>
           </View>
 
-          <TouchableOpacity
-            style={[styles.testBgBtn, isScheduled && styles.testBgBtnActive]}
-            onPress={handleTestNotification}
-            disabled={isScheduled}
-            activeOpacity={0.85}>
-            <MaterialCommunityIcons
-              name={isScheduled ? 'timer-sand' : 'bell-ring'}
-              size={20}
-              color="#ffffff"
-            />
-            <Text style={styles.testBgBtnText}>
-              {isScheduled
-                ? 'ĐÃ HẸN GIỜ (5S) — HÃY KHOÁ MÀN HÌNH ĐIỆN THOẠI NGAY!'
-                : 'THỬ NGHIỆM BÁO ĐỘNG KHI KHOÁ MÀN HÌNH (HẸN GIỜ 5S)'}
-            </Text>
-          </TouchableOpacity>
-
           {/* Service Status */}
           <View style={styles.serviceStatusRow}>
             <View style={[styles.serviceIndicator, isBackgroundServiceRunning && styles.serviceIndicatorActive]} />
@@ -341,13 +277,13 @@ export default function SettingsScreen() {
             </Text>
           </View>
 
-          {/* Foreground Service Test Button */}
+          {/* Test Notification Button */}
           <TouchableOpacity
             style={styles.testFgBtn}
-            onPress={handleTestForegroundNotification}
+            onPress={handleTestAlarm}
             activeOpacity={0.8}>
             <Ionicons name="notifications" size={16} color="#38bdf8" />
-            <Text style={styles.testFgBtnText}>GỬI THÔNG BÁO NGAY (Test Foreground)</Text>
+            <Text style={styles.testFgBtnText}>GỬI THÔNG BÁO TEST (Foreground)</Text>
           </TouchableOpacity>
 
           {/* Battery Optimization Settings */}
@@ -373,120 +309,6 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Section 3: Simulation & Testing Suite */}
-        <View style={[styles.sectionCard, styles.sectionCardHighlight]}>
-          <View style={styles.sectionHeader}>
-            <MaterialCommunityIcons name="flask-outline" size={20} color="#a855f7" />
-            <Text style={[styles.sectionTitle, { color: '#c084fc' }]}>
-              PHÒNG THÍ NGHIỆM GIẢ LẬP (TEST SUITE)
-            </Text>
-          </View>
-
-          <View style={styles.switchRow}>
-            <View style={styles.switchTextCol}>
-              <Text style={styles.switchLabel}>Chế độ Giả Lập (Offline Simulation)</Text>
-              <Text style={styles.switchHelp}>
-                Cho phép kiểm thử trọn vẹn quy trình gọi kỹ sư mà không cần nối WiFi xưởng
-              </Text>
-            </View>
-            <Switch
-              value={config.simulationMode}
-              onValueChange={(val) => updateConfig({ simulationMode: val })}
-              trackColor={{ false: '#1e293b', true: '#9333ea' }}
-              thumbColor={config.simulationMode ? '#c084fc' : '#64748b'}
-            />
-          </View>
-
-          <Text style={[styles.inputLabel, { marginTop: 16 }]}>
-            MÔ PHỎNG TICKET MỚI (CHUYỀN GỌI)
-          </Text>
-
-          <View style={styles.simButtonsCol}>
-            <TouchableOpacity
-              style={styles.simCardBtn}
-              onPress={() =>
-                triggerSimulatedTicket({
-                  machineCode: 'LINE-01',
-                  machineName: 'Máy Ép Nhựa Chấn Thủy Lực #01',
-                  location: 'Khu A - Gian máy 03',
-                  description: 'Kẹt phôi xy-lanh đẩy, cảm biến áp suất báo lỗi E-204',
-                })
-              }
-              activeOpacity={0.8}>
-              <View style={styles.simBtnIcon}>
-                <MaterialCommunityIcons name="cog" size={18} color="#ef4444" />
-              </View>
-              <View style={styles.simBtnTextCol}>
-                <Text style={styles.simBtnTitle}>Sự cố: Máy Ép Nhựa #01</Text>
-                <Text style={styles.simBtnDesc}>Kẹt phôi, áp suất tăng cao</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.simCardBtn}
-              onPress={() =>
-                triggerSimulatedTicket({
-                  machineCode: 'LINE-03',
-                  machineName: 'Robot Hàn Tự Động Fanuc #03',
-                  location: 'Khu B - Chuyền lắp ráp khung',
-                  description: 'Trật khớp trục J4, servo quá tải cần cân chỉnh góc hàn',
-                })
-              }
-              activeOpacity={0.8}>
-              <View style={styles.simBtnIcon}>
-                <MaterialCommunityIcons name="robot-industrial" size={18} color="#f59e0b" />
-              </View>
-              <View style={styles.simBtnTextCol}>
-                <Text style={styles.simBtnTitle}>Sự cố: Robot Hàn Fanuc #03</Text>
-                <Text style={styles.simBtnDesc}>Quá tải servo, lệch vị trí hàn</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.simCardBtn}
-              onPress={() =>
-                triggerSimulatedTicket({
-                  machineCode: 'LINE-07',
-                  machineName: 'Lò Xử Lý Nhiệt Liên Tục #07',
-                  location: 'Xưởng Nhiệt Luyện - Cột H8',
-                  description: 'Nhiệt kế thermocouple buồng đốt 2 bị đứt, báo động quá nhiệt',
-                })
-              }
-              activeOpacity={0.8}>
-              <View style={styles.simBtnIcon}>
-                <MaterialCommunityIcons name="fire" size={18} color="#f43f5e" />
-              </View>
-              <View style={styles.simBtnTextCol}>
-                <Text style={styles.simBtnTitle}>Sự cố: Lò Nhiệt Luyện #07</Text>
-                <Text style={styles.simBtnDesc}>Quá nhiệt buồng đốt</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.networkToggleBtn,
-                connectionStatus === 'DISCONNECTED' && styles.networkToggleBtnActive,
-              ]}
-              onPress={simulateToggleNetwork}
-              activeOpacity={0.8}>
-              <MaterialCommunityIcons
-                name={connectionStatus === 'DISCONNECTED' ? 'wifi-check' : 'wifi-alert'}
-                size={18}
-                color={connectionStatus === 'DISCONNECTED' ? '#10b981' : '#ef4444'}
-              />
-              <Text
-                style={[
-                  styles.networkToggleText,
-                  connectionStatus === 'DISCONNECTED' && { color: '#34d399' },
-                ]}>
-                {connectionStatus === 'DISCONNECTED'
-                  ? 'Khôi phục kết nối mạng'
-                  : 'Mô phỏng Mất kết nối mạng'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
         {/* Section 4: System Information */}
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
@@ -497,6 +319,10 @@ export default function SettingsScreen() {
           <View style={styles.infoLine}>
             <Text style={styles.infoLineLabel}>Phiên bản App</Text>
             <Text style={styles.infoLineVal}>v1.0.0 (Expo SDK 54)</Text>
+          </View>
+          <View style={styles.infoLine}>
+            <Text style={styles.infoLineLabel}>Trạng thái kết nối</Text>
+            <Text style={styles.infoLineVal}>{connectionStatus}</Text>
           </View>
           <View style={styles.infoLine}>
             <Text style={styles.infoLineLabel}>Tần suất quét ticket</Text>
@@ -554,10 +380,6 @@ const styles = StyleSheet.create({
     borderColor: '#1e293b',
     borderRadius: 16,
     padding: 16,
-  },
-  sectionCardHighlight: {
-    borderColor: 'rgba(168, 85, 247, 0.4)',
-    backgroundColor: 'rgba(168, 85, 247, 0.04)',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -655,84 +477,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#1e293b',
     marginVertical: 12,
   },
-  testAudioRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 14,
-  },
-  testBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(30, 41, 59, 0.7)',
-    borderWidth: 1,
-    borderColor: '#334155',
-    borderRadius: 8,
-    paddingVertical: 10,
-  },
-  testBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#cbd5e1',
-  },
-  simButtonsCol: {
-    gap: 10,
-    marginTop: 8,
-  },
-  simCardBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: 'rgba(15, 23, 42, 0.8)',
-    borderWidth: 1,
-    borderColor: '#334155',
-    borderRadius: 12,
-    padding: 12,
-  },
-  simBtnIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  simBtnTextCol: {
-    flex: 1,
-  },
-  simBtnTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#f8fafc',
-    marginBottom: 2,
-  },
-  simBtnDesc: {
-    fontSize: 11,
-    color: '#94a3b8',
-  },
-  networkToggleBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.3)',
-    borderRadius: 10,
-    paddingVertical: 12,
-    marginTop: 4,
-  },
-  networkToggleBtnActive: {
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-  },
-  networkToggleText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#fca5a5',
-  },
   infoLine: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -749,12 +493,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#cbd5e1',
     fontWeight: '700',
-  },
-  bgNoticeDesc: {
-    fontSize: 12,
-    color: '#cbd5e1',
-    lineHeight: 18,
-    marginBottom: 12,
   },
   bgRuleBox: {
     backgroundColor: 'rgba(15, 23, 42, 0.7)',
@@ -773,45 +511,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#cbd5e1',
     lineHeight: 17,
-  },
-  tokenBox: {
-    backgroundColor: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#334155',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 14,
-  },
-  tokenLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#38bdf8',
-    letterSpacing: 0.8,
-    marginBottom: 4,
-  },
-  tokenValue: {
-    fontSize: 11,
-    color: '#f8fafc',
-    fontFamily: 'monospace',
-    marginBottom: 4,
-  },
-  tokenHelp: {
-    fontSize: 11,
-    color: '#64748b',
-  },
-  testBgBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    backgroundColor: '#ef4444',
-    borderRadius: 12,
-    paddingVertical: 14,
-    shadowColor: '#ef4444',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 4,
   },
   serviceStatusRow: {
     flexDirection: 'row',
@@ -867,16 +566,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: '#10b981',
-  },
-  testBgBtnActive: {
-    backgroundColor: '#b91c1c',
-  },
-  testBgBtnText: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#ffffff',
-    letterSpacing: 0.5,
-    textAlign: 'center',
   },
   batteryTipBox: {
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
