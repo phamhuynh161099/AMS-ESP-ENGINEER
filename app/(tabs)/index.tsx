@@ -18,7 +18,7 @@ export default function DashboardScreen() {
   const { transitionState, isAlarmActive } = useEngineer();
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <StatusBar style="light" />
 
       <OledHeader />
@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 20,
+    paddingBottom: 80,
   },
   alarmActivePill: {
     flexDirection: 'row',

@@ -1,9 +1,13 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { HapticTab } from '@/components/haptic-tab';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
@@ -15,8 +19,8 @@ export default function TabLayout() {
           backgroundColor: '#090d16',
           borderTopColor: '#1e293b',
           borderTopWidth: 1,
-          height: 60,
-          paddingBottom: 8,
+          height: 60 + insets.bottom,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
           paddingTop: 6,
         },
         tabBarLabelStyle: {
@@ -49,7 +53,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Cài Đặt & Lab',
+          title: 'Cài Đặt',
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="tune-variant" size={size || 24} color={color} />
           ),
