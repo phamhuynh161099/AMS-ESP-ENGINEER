@@ -1,13 +1,23 @@
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
-import { AppState, AppStateStatus } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { alarmService } from '@/services/alarm';
+import {
+  acknowledgeTicket,
+  checkPendingRequests,
+  getEngineerInfoByMac,
+} from '@/services/api';
+import {
+  openBatterySettings,
+  sendTestNotification,
+  setupBackgroundChannels,
+  startBackgroundPolling,
+  stopBackgroundPolling,
+} from '@/services/backgroundPolling';
+import { isBackgroundDutyEnabled as readDutyPreference, setBackgroundDutyEnabled } from '@/services/dutyPreference';
+import {
+  dismissEmergencyNotification,
+  registerForPushNotificationsAsync,
+  sendEmergencyNotification,
+  setDutyNotification,
+} from '@/services/notifications';
 import {
   ActivityLog,
   ConnectionStatus,
@@ -17,27 +27,17 @@ import {
   TicketInfo,
   TransitionScreenState,
 } from '@/types/engineer';
-import { alarmService } from '@/services/alarm';
-import {
-  acknowledgeTicket,
-  checkPendingRequests,
-  getEngineerInfoByMac,
-} from '@/services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
-import {
-  registerForPushNotificationsAsync,
-  sendEmergencyNotification,
-  dismissEmergencyNotification,
-  setDutyNotification,
-} from '@/services/notifications';
-import {
-  startBackgroundPolling,
-  stopBackgroundPolling,
-  sendTestNotification,
-  openBatterySettings,
-  setupBackgroundChannels,
-} from '@/services/backgroundPolling';
-import { setBackgroundDutyEnabled, isBackgroundDutyEnabled as readDutyPreference } from '@/services/dutyPreference';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 
 const STORAGE_KEY_CONFIG = '@esp_engineer_config_v2';
 const STORAGE_KEY_LOGS = '@esp_engineer_logs_v1';
@@ -152,7 +152,7 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
       };
       setLogs((prev) => {
         const updated = [newLog, ...prev.slice(0, 49)];
-        AsyncStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(updated)).catch(() => {});
+        AsyncStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(updated)).catch(() => { });
         return updated;
       });
     },
@@ -207,7 +207,7 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
   const updateConfig = useCallback(async (newConfig: Partial<ServerConfig>) => {
     setConfig((prev) => {
       const updated = { ...prev, ...newConfig };
-      AsyncStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify(updated)).catch(() => {});
+      AsyncStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify(updated)).catch(() => { });
       return updated;
     });
   }, []);
@@ -342,7 +342,7 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
         setCurrentTicket(ticket);
         setState('ACKNOWLEDGED');
         silenceAlarm();
-        dismissEmergencyNotification().catch(() => {});
+        dismissEmergencyNotification().catch(() => { });
         addLog(
           'ACK',
           `Đã ghi nhận nhận việc: ${ticket.machineName}`,
@@ -351,7 +351,7 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     } else {
       // Server returned hasRequest == false
-      dismissEmergencyNotification().catch(() => {});
+      dismissEmergencyNotification().catch(() => { });
       if (prevState === 'ACKNOWLEDGED') {
         // Line operator confirmed complete!
         silenceAlarm();
@@ -378,7 +378,7 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
     setIsAcknowledging(true);
     setAcknowledgeError(null);
     silenceAlarm();
-    dismissEmergencyNotification().catch(() => {});
+    dismissEmergencyNotification().catch(() => { });
 
     const { serverBaseUrl, macAddress } = configRef.current;
     const res = await acknowledgeTicket(serverBaseUrl, ticket.id, macAddress);
@@ -393,7 +393,7 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
         acknowledgedAt: Date.now(),
       }));
       triggerSuccessBeeps();
-      dismissEmergencyNotification().catch(() => {});
+      dismissEmergencyNotification().catch(() => { });
       addLog('ACK', `ĐÃ NHẬN VIỆC: ${ticket.machineName}`, ticket.location);
       return true;
     } else {
@@ -499,9 +499,9 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
       setDutyNotification(true, {
         lineName: engineerInfo.lineName || 'assem #2',
         engineerName: engineerInfo.name || 'Kỹ sư ID: 12',
-      }).catch(() => {});
+      }).catch(() => { });
     } else {
-      setDutyNotification(false).catch(() => {});
+      setDutyNotification(false).catch(() => { });
     }
   }, [engineerInfo.lineName, engineerInfo.name, isBackgroundDutyEnabled]);
 
@@ -516,7 +516,7 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
             setIsBackgroundDutyEnabled(enabled);
             setIsBackgroundServiceRunning(enabled);
           })
-          .catch(() => {});
+          .catch(() => { });
 
         // Immediately fetch data on unlock / focus
         checkRequests();
@@ -528,7 +528,7 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
           setDutyNotification(true, {
             lineName: engineerInfoRef.current.lineName || 'assem #2',
             engineerName: engineerInfoRef.current.name || 'Kỹ sư ID: 12',
-          }).catch(() => {});
+          }).catch(() => { });
         }
       }
     });
@@ -561,7 +561,7 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
         clearLogs,
         toggleBackgroundDuty,
         startBackgroundPolling: async () => {
-          await setupBackgroundChannels().catch(() => {});
+          await setupBackgroundChannels().catch(() => { });
           await startBackgroundPolling(configRef.current.serverBaseUrl, configRef.current.engineerId);
           setIsBackgroundServiceRunning(true);
         },

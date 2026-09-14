@@ -1,6 +1,11 @@
+import { useEngineer } from '@/context/EngineerContext';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import {
   Alert,
+  Keyboard,
+  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -10,9 +15,14 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useEngineer } from '@/context/EngineerContext';
+
+const SETTINGS_PASSWORD = 'ph1234//';
+
+// Preset options for quick selection
+const PRESET_OPTIONS = [
+  { engineerId: '12', mac: 'AC:0B:FB:C2:9F:70', label: 'Kỹ sư 12 - MAC 9F:70' },
+  { engineerId: '14', mac: 'AC:0B:FB:C2:C2:11', label: 'Kỹ sư 14 - MAC C2:11' },
+];
 
 export default function SettingsScreen() {
   const {
@@ -26,10 +36,26 @@ export default function SettingsScreen() {
     isBackgroundServiceRunning,
   } = useEngineer();
 
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [authError, setAuthError] = useState(false);
+
   const [baseUrl, setBaseUrl] = useState(config.serverBaseUrl);
   const [engId, setEngId] = useState(config.engineerId || '12');
   const [mac, setMac] = useState(config.macAddress);
   const [isSaved, setIsSaved] = useState(false);
+
+  const handlePasswordSubmit = () => {
+    if (passwordInput === SETTINGS_PASSWORD) {
+      setIsAuthenticated(true);
+      setAuthError(false);
+      setPasswordInput('');
+      Keyboard.dismiss();
+    } else {
+      setAuthError(true);
+      setPasswordInput('');
+    }
+  };
 
   const handleSaveConfig = async () => {
     await updateConfig({
@@ -99,6 +125,48 @@ export default function SettingsScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
 
+      {/* Lock Screen Overlay */}
+      {!isAuthenticated && (
+        <Pressable style={lockStyles.overlay} onPress={Keyboard.dismiss}>
+          <View style={lockStyles.lockBox}>
+            <View style={lockStyles.iconCircle}>
+              <Ionicons name="lock-closed" size={40} color="#38bdf8" />
+            </View>
+            <Text style={lockStyles.lockTitle}>YÊU CẦU MẬT KHẨU</Text>
+            <Text style={lockStyles.lockSubtitle}>
+              Tab Cài Đặt được bảo vệ.{'\n'}Vui lòng nhập mật khẩu để truy cập.
+            </Text>
+
+            <TextInput
+              style={[lockStyles.lockInput, authError && lockStyles.lockInputError]}
+              value={passwordInput}
+              onChangeText={(text) => {
+                setPasswordInput(text);
+                if (authError) setAuthError(false);
+              }}
+              placeholder="••••••••"
+              placeholderTextColor="#475569"
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="done"
+              onSubmitEditing={handlePasswordSubmit}
+            />
+            {authError && (
+              <Text style={lockStyles.errorText}>Mật khẩu không đúng. Vui lòng thử lại.</Text>
+            )}
+
+            <TouchableOpacity
+              style={lockStyles.unlockBtn}
+              onPress={handlePasswordSubmit}
+              activeOpacity={0.8}>
+              <Ionicons name="log-in-outline" size={18} color="#fff" />
+              <Text style={lockStyles.unlockBtnText}>MỞ KHÓA</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      )}
+
       <View style={styles.header}>
         <View>
           <Text style={styles.headerSubtitle}>HỆ THỐNG CÔNG NGHIỆP</Text>
@@ -163,6 +231,31 @@ export default function SettingsScreen() {
           <Text style={styles.inputHelp}>
             Server ánh xạ địa chỉ MAC này với Kỹ sư và Chuyền phân công trong cơ sở dữ liệu.
           </Text>
+
+          {/* Preset Quick Selection */}
+          <View style={styles.presetSection}>
+            <Text style={styles.inputLabel}>CHỌN NHANH (PRESETS)</Text>
+            <View style={styles.presetRow}>
+              {PRESET_OPTIONS.map((preset, index) => {
+                const isSelected = engId === preset.engineerId && mac === preset.mac;
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    style={[styles.presetBtn, isSelected && styles.presetBtnSelected]}
+                    onPress={() => {
+                      setEngId(preset.engineerId);
+                      setMac(preset.mac);
+                      Keyboard.dismiss();
+                    }}
+                    activeOpacity={0.7}>
+                    <Text style={[styles.presetBtnText, isSelected && styles.presetBtnTextSelected]}>
+                      {preset.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
 
           <View style={styles.btnRow}>
             <TouchableOpacity
@@ -303,7 +396,6 @@ export default function SettingsScreen() {
             </View>
             <Text style={styles.batteryTipDesc}>
               • Pin: Chọn chế độ <Text style={styles.boldWhite}>&quot;Không hạn chế&quot;</Text> (Unrestricted).{'\n'}
-              • Xiaomi / Oppo: Bật <Text style={styles.boldWhite}>&quot;Tự khởi chạy&quot;</Text> (Autostart).{'\n'}
               • Đa nhiệm: Nhấn giữ / vuốt icon app và chọn <Text style={styles.boldWhite}>Ổ khóa</Text> để app không bị tắt khi tắt màn hình lâu.
             </Text>
           </View>
@@ -415,6 +507,37 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#64748b',
     marginTop: 4,
+  },
+  presetSection: {
+    marginTop: 14,
+  },
+  presetRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 6,
+  },
+  presetBtn: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+  },
+  presetBtnSelected: {
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    borderColor: '#38bdf8',
+  },
+  presetBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748b',
+    textAlign: 'center',
+  },
+  presetBtnTextSelected: {
+    color: '#38bdf8',
   },
   btnRow: {
     flexDirection: 'row',
@@ -595,5 +718,90 @@ const styles = StyleSheet.create({
   boldWhite: {
     color: '#f8fafc',
     fontWeight: '700',
+  },
+});
+
+const lockStyles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(3, 7, 18, 0.97)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  lockBox: {
+    width: '86%',
+    backgroundColor: '#090d16',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    borderRadius: 20,
+    padding: 28,
+    alignItems: 'center',
+  },
+  iconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(56, 189, 248, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  lockTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#f8fafc',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  lockSubtitle: {
+    fontSize: 13,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 22,
+  },
+  lockInput: {
+    width: '100%',
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    fontSize: 16,
+    color: '#f8fafc',
+    textAlign: 'center',
+    letterSpacing: 4,
+    marginBottom: 8,
+  },
+  lockInputError: {
+    borderColor: '#ef4444',
+    backgroundColor: 'rgba(239, 68, 68, 0.05)',
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#ef4444',
+    marginBottom: 12,
+    fontWeight: '600',
+  },
+  unlockBtn: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#0284c7',
+    borderRadius: 12,
+    paddingVertical: 13,
+    marginTop: 4,
+  },
+  unlockBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: 0.5,
   },
 });

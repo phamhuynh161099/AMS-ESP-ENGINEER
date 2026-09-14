@@ -1,10 +1,10 @@
-import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import notifee, {
+  AndroidCategory,
   AndroidImportance,
   AndroidVisibility,
-  AndroidCategory,
 } from '@felipe-software/react-native-notify-kit';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { checkPendingRequests } from './api';
 import { setBackgroundDutyEnabled } from './dutyPreference';
 
@@ -12,7 +12,7 @@ import { setBackgroundDutyEnabled } from './dutyPreference';
 // Channel IDs
 // ---------------------------------------------------------------------------
 export const CHANNEL_REALTIME = 'realtime-alert';
-export const CHANNEL_DUTY     = 'duty-status';
+export const CHANNEL_DUTY = 'duty-status';
 
 const SOUND_ALERT = 'alert_sound'; // falls back to default if file missing
 
@@ -40,23 +40,23 @@ export async function setupBackgroundChannels(): Promise<void> {
 
   // Emergency / real-time alerts: HIGH importance + sound + vibration + bypass DND
   await notifee.createChannel({
-    id:          CHANNEL_REALTIME,
-    name:        'Thông báo Sự cố (Engineer Call)',
-    importance:   AndroidImportance.HIGH,
-    visibility:  AndroidVisibility.PUBLIC,
-    sound:       SOUND_ALERT,
-    vibration:   true,
-    bypassDnd:   true,
-    lightColor:   '#ef4444',
+    id: CHANNEL_REALTIME,
+    name: 'Thông báo Sự cố (Engineer Call)',
+    importance: AndroidImportance.HIGH,
+    visibility: AndroidVisibility.PUBLIC,
+    sound: SOUND_ALERT,
+    vibration: true,
+    bypassDnd: true,
+    lightColor: '#ef4444',
   });
 
   // Duty / ongoing status: LOW, silent, no badge
   await notifee.createChannel({
-    id:          CHANNEL_DUTY,
-    name:        'Trạng Thái Trực Ca',
-    importance:   AndroidImportance.LOW,
-    sound:       undefined,
-    vibration:   false,
+    id: CHANNEL_DUTY,
+    name: 'Trạng Thái Trực Ca',
+    importance: AndroidImportance.LOW,
+    sound: undefined,
+    vibration: false,
     visibility: AndroidVisibility.PUBLIC,
   });
 }
@@ -118,24 +118,24 @@ async function pollAndAlert(
       // Status must be something other than ACKNOWLEDGED to trigger an alert
       if (ticket.status !== 'ACKNOWLEDGED') {
         await notifee.displayNotification({
-          title:   `🚨 SỰ CỐ KHẨN CẤP: ${ticket.machineName}`,
-          body:    `Vị trí: ${ticket.location}. Chạm để xác nhận nhận việc!`,
+          title: `🚨 SỰ CỐ KHẨN CẤP: ${ticket.machineName}`,
+          body: `Vị trí: ${ticket.location}. Chạm để xác nhận nhận việc!`,
           data: {
-            type:     'EMERGENCY_CALL',
+            type: 'EMERGENCY_CALL',
             ticketId: ticket.id,
             machineName: ticket.machineName,
-            location:    ticket.location,
-            description:  ticket.description,
+            location: ticket.location,
+            description: ticket.description,
           },
           android: {
-            channelId:          CHANNEL_REALTIME,
-            importance:          AndroidImportance.HIGH,
-            sound:               SOUND_ALERT,
-            pressAction:         { id: 'default' },
-            fullScreenAction:    { id: 'default' },
-            category:            AndroidCategory.CALL,
-            vibrationPattern:     [0, 500, 200, 500, 200, 500, 200, 500],
-            autoCancel:           false, // keep until user taps
+            channelId: CHANNEL_REALTIME,
+            importance: AndroidImportance.HIGH,
+            sound: SOUND_ALERT,
+            pressAction: { id: 'default' },
+            fullScreenAction: { id: 'default' },
+            category: AndroidCategory.CALL,
+            vibrationPattern: [0, 500, 200, 500, 200, 500, 200, 500],
+            autoCancel: false, // keep until user taps
           },
         });
       }
@@ -208,8 +208,8 @@ export async function startBackgroundPolling(
 
   // Ongoing notification — user can tap to open app or tap action to stop
   await notifee.displayNotification({
-    title:   '🔄 Đang đồng bộ dữ liệu',
-    body:    'Ứng dụng đang chạy nền • Sẵn sàng nhận sự cố',
+    title: '🔄 Đang đồng bộ dữ liệu',
+    body: 'Ứng dụng đang chạy nền • Sẵn sàng nhận sự cố',
     android: {
       channelId: CHANNEL_DUTY,
       asForegroundService: true,
@@ -240,7 +240,7 @@ export async function stopBackgroundPolling(): Promise<void> {
 
   try {
     await setBackgroundDutyEnabled(false);
-  } catch {}
+  } catch { }
 
   try {
     await notifee.stopForegroundService();
@@ -258,16 +258,16 @@ export async function sendTestNotification(ticketInfo?: {
 }): Promise<void> {
   await setupBackgroundChannels();
   await notifee.displayNotification({
-    title:   `🚨 SỰ CỐ MỚI: ${ticketInfo?.machineName ?? 'Chuyền us #11'}`,
-    body:    `Vị trí: ${ticketInfo?.location ?? 'Location us #11'}. Bấm để xem chi tiết!`,
+    title: `🚨 SỰ CỐ MỚI: ${ticketInfo?.machineName ?? 'Chuyền us #11'}`,
+    body: `Vị trí: ${ticketInfo?.location ?? 'Location us #11'}. Bấm để xem chi tiết!`,
     android: {
-      channelId:          CHANNEL_REALTIME,
-      importance:          AndroidImportance.HIGH,
-      sound:               SOUND_ALERT,
-      pressAction:         { id: 'default' },
-      fullScreenAction:    { id: 'default' },
-      category:            AndroidCategory.CALL,
-      vibrationPattern:     [0, 500, 200, 500, 200, 500, 200, 500],
+      channelId: CHANNEL_REALTIME,
+      importance: AndroidImportance.HIGH,
+      sound: SOUND_ALERT,
+      pressAction: { id: 'default' },
+      fullScreenAction: { id: 'default' },
+      category: AndroidCategory.CALL,
+      vibrationPattern: [0, 500, 200, 500, 200, 500, 200, 500],
     },
   });
 }

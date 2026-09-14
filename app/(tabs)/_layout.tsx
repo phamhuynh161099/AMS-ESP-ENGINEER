@@ -1,9 +1,8 @@
+import { HapticTab } from '@/components/haptic-tab';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { HapticTab } from '@/components/haptic-tab';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -40,6 +39,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="history"
         options={{
+          href: null,
           title: 'Nhật Ký',
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons

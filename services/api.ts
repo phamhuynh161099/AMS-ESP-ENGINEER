@@ -1,5 +1,5 @@
-import { Platform } from 'react-native';
 import { EngineerInfo, TicketInfo } from '@/types/engineer';
+import { Platform } from 'react-native';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -191,9 +191,9 @@ export async function checkPendingRequests(
         location: String(data.location ?? 'Chưa có vị trí'),
         description: String(
           data.issueDescription ??
-            data.description ??
-            data.issue ??
-            'Yêu cầu hỗ trợ kỹ thuật tại chuyền'
+          data.description ??
+          data.issue ??
+          'Yêu cầu hỗ trợ kỹ thuật tại chuyền'
         ),
         status: String(data.status ?? 'REQUESTED'),
       };
