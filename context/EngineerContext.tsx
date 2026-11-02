@@ -2,6 +2,8 @@ import { alarmService } from '@/services/alarm';
 import {
   acknowledgeTicket,
   checkPendingRequests,
+  completeRepair,
+  fetchFaultList,
   getEngineerInfoByMac,
 } from '@/services/api';
 import {
@@ -23,6 +25,10 @@ import {
   ConnectionStatus,
   DeviceState,
   EngineerInfo,
+  FaultItem,
+  RepairFormState,
+  RepairRouter,
+  SelectedFault,
   ServerConfig,
   TicketInfo,
   TransitionScreenState,
@@ -72,6 +78,18 @@ const INITIAL_TICKET: TicketInfo = {
   status: '',
 };
 
+const EMPTY_REPAIR_FORM: RepairFormState = {
+  router: null,
+  machineCode: '',
+  selectedFaults: [],
+};
+
+/** Fault list cached per router for the current session */
+const EMPTY_FAULT_CACHE: Record<RepairRouter, FaultItem[]> = {
+  A: [],
+  B: [],
+};
+
 interface EngineerContextValue {
   // State
   state: DeviceState;
@@ -88,6 +106,12 @@ interface EngineerContextValue {
   pushToken: string | null;
   isBackgroundDutyEnabled: boolean;
 
+  // Repair form (in-memory, per ticket session)
+  repairForm: RepairFormState;
+  isRepairSubmitting: boolean;
+  completeRepairError: string | null;
+  faultLists: Record<RepairRouter, FaultItem[]>;
+
   // Actions
   updateConfig: (newConfig: Partial<ServerConfig>) => Promise<void>;
   acknowledgeCurrentTicket: () => Promise<boolean>;
@@ -99,6 +123,14 @@ interface EngineerContextValue {
   sendTestNotification: (info?: { machineName?: string; location?: string }) => Promise<void>;
   openBatterySettings: () => Promise<void>;
   isBackgroundServiceRunning: boolean;
+
+  // Repair form actions
+  selectRepairRouter: (router: RepairRouter) => void;
+  clearRepairRouter: () => void;
+  setRepairMachineCode: (code: string) => void;
+  toggleSelectedFault: (fault: SelectedFault) => void;
+  loadFaultList: (router: RepairRouter) => Promise<void>;
+  submitCompleteRepair: () => Promise<boolean>;
 }
 
 const EngineerContext = createContext<EngineerContextValue | null>(null);
@@ -127,6 +159,14 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
     expiresAt: 0,
   });
 
+  // Repair form state (session-scoped, cleared when a new ticket starts)
+  const [repairForm, setRepairForm] = useState<RepairFormState>(EMPTY_REPAIR_FORM);
+  const [isRepairSubmitting, setIsRepairSubmitting] = useState<boolean>(false);
+  const [completeRepairError, setCompleteRepairError] = useState<string | null>(null);
+  const [faultLists, setFaultLists] = useState<Record<RepairRouter, FaultItem[]>>(
+    EMPTY_FAULT_CACHE
+  );
+
   // Keep references to latest state to avoid stale closures in polling loops
   const stateRef = useRef<DeviceState>(state);
   stateRef.current = state;
@@ -139,6 +179,10 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const configRef = useRef<ServerConfig>(config);
   configRef.current = config;
+
+  // Refs pattern: repair form
+  const repairFormRef = useRef<RepairFormState>(repairForm);
+  repairFormRef.current = repairForm;
 
   // Append activity log
   const addLog = useCallback(
@@ -242,6 +286,106 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   }, []);
 
+  // ===== Repair form actions (Route A/B — only for ACKNOWLEDGED tickets) =====
+
+  // Load fault list from server (cache per router, refetch on demand)
+  const loadFaultList = useCallback(
+    async (router: RepairRouter) => {
+      const { serverBaseUrl } = configRef.current;
+      const res = await fetchFaultList(serverBaseUrl, router);
+      if (res.success && res.data) {
+        setFaultLists((prev) => ({ ...prev, [router]: res.data!.data }));
+      }
+    },
+    []
+  );
+
+  const selectRepairRouter = useCallback((router: RepairRouter) => {
+    setCompleteRepairError(null);
+    setRepairForm((prev) => ({
+      router,
+      // Route B không có bước scan → machine_code luôn null
+      machineCode: router === 'A' ? prev.machineCode : '',
+      selectedFaults: [],
+    }));
+  }, []);
+
+  const clearRepairRouter = useCallback(() => {
+    setRepairForm(EMPTY_REPAIR_FORM);
+    setCompleteRepairError(null);
+  }, []);
+
+  const setRepairMachineCode = useCallback((code: string) => {
+    setRepairForm((prev) => ({ ...prev, machineCode: code }));
+  }, []);
+
+  const toggleSelectedFault = useCallback((fault: SelectedFault) => {
+    setRepairForm((prev) => {
+      const exists = prev.selectedFaults.some(
+        (f) => f.fault_l1_code === fault.fault_l1_code
+      );
+      return {
+        ...prev,
+        selectedFaults: exists
+          ? prev.selectedFaults.filter((f) => f.fault_l1_code !== fault.fault_l1_code)
+          : [...prev.selectedFaults, fault],
+      };
+    });
+  }, []);
+
+  // Submit: POST /complete-repair (endpoint riêng) gửi machine_code + router + arrIssue.
+  // Xong clear form, giữ state ACKNOWLEDGED cho tới khi tuyến xác nhận xong việc
+  // trên server — logic cũ không đổi.
+  const submitCompleteRepair = useCallback(async (): Promise<boolean> => {
+    const ticket = currentTicketRef.current;
+    const form = repairFormRef.current;
+    if (!ticket.id || !form.router) return false;
+
+    if (form.router === 'A' && form.machineCode.trim() === '') {
+      setCompleteRepairError('Vui lòng quét mã máy (scan) trước khi hoàn thành.');
+      return false;
+    }
+    if (form.selectedFaults.length === 0) {
+      setCompleteRepairError('Vui lòng chọn ít nhất 1 lỗi đã sửa.');
+      return false;
+    }
+
+    const { serverBaseUrl, macAddress } = configRef.current;
+    setIsRepairSubmitting(true);
+    setCompleteRepairError(null);
+
+    const res = await completeRepair(
+      serverBaseUrl,
+      ticket.id,
+      macAddress,
+      form.router === 'B' ? null : form.machineCode.trim(),
+      form.router,
+      form.selectedFaults
+    );
+
+    setIsRepairSubmitting(false);
+
+    if (res.success) {
+      const routeLabel = form.router === 'A' ? 'Route A (hư hỏng máy)' : 'Route B (tiện ích)';
+      addLog(
+        'SUCCESS',
+        `ĐÃ GỬI HOÀN THÀNH SỬA — ${routeLabel}`,
+        `machine_code: ${form.router === 'B' ? 'null' : form.machineCode.trim()} • ${form.selectedFaults
+          .map((f) => f.fault_l1)
+          .join(', ')}`
+      );
+      triggerSuccessBeeps();
+      // Clear form: giá trị chỉ giữ trong phiên ticket này
+      setRepairForm(EMPTY_REPAIR_FORM);
+      return true;
+    } else {
+      const errMsg = res.error || 'Gửi hoàn thành sửa chữa thất bại, vui lòng thử lại';
+      setCompleteRepairError(errMsg);
+      addLog('ERROR', `Gửi hoàn thành sửa chữa thất bại: ${errMsg}`);
+      return false;
+    }
+  }, [addLog, triggerSuccessBeeps]);
+
   // Transition screen helper (e.g. 4 seconds E.SUCCESS or RESET)
   const setTransition = useCallback(
     (title: string, line1: string, line2: string, durationMs = 4000) => {
@@ -328,6 +472,9 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
         setCurrentTicket(ticket);
         setState('REQUEST_RECEIVED');
         setAcknowledgeError(null);
+        // Ticket mới → clear form hoàn thành (giá trị chỉ giữ trong phiên ticket)
+        setRepairForm(EMPTY_REPAIR_FORM);
+        setCompleteRepairError(null);
         triggerAlarm();
         sendEmergencyNotification(ticket).catch((e) =>
           console.log('[Emergency Notif Error]:', e?.message)
@@ -357,6 +504,8 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
         silenceAlarm();
         setState('IDLE');
         setCurrentTicket(INITIAL_TICKET);
+        setRepairForm(EMPTY_REPAIR_FORM);
+        setCompleteRepairError(null);
         setTransition('E.SUCCESS', 'Người dùng đã xác nhận xong việc', 'Sau 4s sẽ hiện thông tin');
         addLog('SUCCESS', 'Người dùng tại chuyền đã xác nhận xong việc', prevTicket.machineName);
       } else if (prevState === 'REQUEST_RECEIVED') {
@@ -555,11 +704,21 @@ export const EngineerProvider: React.FC<{ children: React.ReactNode }> = ({
         pushToken,
         isBackgroundDutyEnabled,
         isBackgroundServiceRunning,
+        repairForm,
+        isRepairSubmitting,
+        completeRepairError,
+        faultLists,
         updateConfig,
         acknowledgeCurrentTicket,
         manualRefresh,
         clearLogs,
         toggleBackgroundDuty,
+        selectRepairRouter,
+        clearRepairRouter,
+        setRepairMachineCode,
+        toggleSelectedFault,
+        loadFaultList,
+        submitCompleteRepair,
         startBackgroundPolling: async () => {
           await setupBackgroundChannels().catch(() => { });
           await startBackgroundPolling(configRef.current.serverBaseUrl, configRef.current.engineerId);

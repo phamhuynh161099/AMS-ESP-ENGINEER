@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEngineer } from '@/context/EngineerContext';
+import { RepairFormCard } from '@/components/engineer/RepairFormCard';
 
 export const TicketCard: React.FC = () => {
   const {
@@ -192,6 +193,9 @@ export const TicketCard: React.FC = () => {
         <Text style={styles.ackDescLabel}>Nội dung sự cố:</Text>
         <Text style={styles.ackDescText}>{currentTicket.description}</Text>
       </View>
+
+      {/* Route A/B repair form (scan máy + chọn lỗi + hoàn thành) */}
+      <RepairFormCard />
 
       {/* Instruction for waiting operator completion */}
       <View style={styles.waitingNotice}>

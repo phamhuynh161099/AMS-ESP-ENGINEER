@@ -55,3 +55,33 @@ export interface TransitionScreenState {
   line2: string;
   expiresAt: number;
 }
+
+export type RepairRouter = 'A' | 'B';
+
+/** Một mục lỗi lấy từ /issue-machine/router-a hoặc /issue-machine/router-b */
+export interface FaultItem {
+  id: number;
+  router_type: RepairRouter;
+  fault_group: string;
+  fault_group_code: string | null;
+  fault_l1: string;
+  fault_l1_code: string;
+}
+
+/** Dạng lỗi đã chọn sẽ gửi lên server (trường arrIssue) */
+export interface SelectedFault {
+  fault_group: string;
+  fault_group_code: string | null;
+  fault_l1: string;
+  fault_l1_code: string;
+}
+
+/**
+ * Form hoàn thành sửa chữa — chỉ giữ trong PHIÊN TICKET (in-memory).
+ * Ticket mới nhận việc sẽ được clear hoàn toàn.
+ */
+export interface RepairFormState {
+  router: RepairRouter | null;
+  machineCode: string; // Route A: mã scan từ PDA/camera • Route B: ''
+  selectedFaults: SelectedFault[];
+}

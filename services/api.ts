@@ -1,4 +1,4 @@
-import { EngineerInfo, TicketInfo } from '@/types/engineer';
+import { EngineerInfo, FaultItem, RepairRouter, TicketInfo } from '@/types/engineer';
 import { Platform } from 'react-native';
 
 interface ApiResponse<T> {
@@ -272,6 +272,124 @@ export async function acknowledgeTicket(
     return {
       success: false,
       error: err?.message || 'Mất kết nối mạng khi gửi xác nhận',
+    };
+  }
+}
+
+/**
+ * GET /issue-machine/router-a  (Router A: menu 2 cấp fault_group → fault_l1)
+ * GET /issue-machine/router-b  (Router B: menu 1 cấp, fault_group rỗng)
+ * Trả về danh sách lỗi cho phép kỹ sư chọn nhiều.
+ */
+export async function fetchFaultList(
+  baseUrl: string,
+  router: RepairRouter
+): Promise<ApiResponse<{ total: number; data: FaultItem[] }>> {
+  const path = `/issue-machine/router-${router.toLowerCase()}`;
+  const url = resolveUrl(baseUrl, path);
+  try {
+    const res = await fetchWithTimeout(
+      url,
+      {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+      },
+      8000
+    );
+
+    const httpCode = res.status;
+    if (!res.ok) {
+      return {
+        success: false,
+        httpCode,
+        error: `Máy chủ phản hồi ${httpCode} khi lấy danh sách lỗi Route ${router}`,
+      };
+    }
+
+    const json = await res.json();
+    const payload = json?.etc ?? json; // hỗ trợ cả {etc:{...}} và phẳng {total,data}
+    const items: FaultItem[] = Array.isArray(payload?.data) ? payload.data : [];
+
+    return {
+      success: true,
+      httpCode,
+      data: { total: Number(payload?.total ?? items.length), data: items },
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || `Không thể lấy danh sách lỗi Route ${router}`,
+    };
+  }
+}
+
+/**
+ * Hoàn thành sửa chữa — POST /complete-repair (endpoint riêng, tách khỏi /acknowledge)
+ *
+ * Payload: { currentRequestId, macAddress, machine_code, router, arrIssue }
+ * Router A: machine_code = mã scan (PDA/camera), arrIssue = lỗi 2 cấp đã chọn.
+ * Router B: machine_code = null, arrIssue = lỗi 1 cấp đã chọn.
+ */
+export async function completeRepair(
+  baseUrl: string,
+  requestId: string,
+  macAddress: string,
+  machineCode: string | null,
+  router: RepairRouter,
+  arrIssue: {
+    fault_group: string;
+    fault_group_code: string | null;
+    fault_l1: string;
+    fault_l1_code: string;
+  }[]
+): Promise<ApiResponse<boolean>> {
+  const url = resolveUrl(baseUrl, '/complete-repair');
+  const payload = {
+    currentRequestId: requestId,
+    macAddress: macAddress,
+    machine_code: machineCode,
+    router: router,
+    arrIssue: arrIssue,
+  };
+
+  try {
+    console.log('[API] Sending completeRepair to:', url, payload);
+    const res = await fetchWithTimeout(
+      url,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(payload),
+      },
+      15000
+    );
+
+    const httpCode = res.status;
+    if (!res.ok) {
+      return {
+        success: false,
+        httpCode,
+        error: `Lỗi máy chủ (${httpCode}) khi gửi hoàn thành sửa chữa`,
+      };
+    }
+
+    const json = await res.json();
+    // Server trả về: { "etc": { "isSuccess": true } }
+    const isSuccess = Boolean(json?.etc?.isSuccess ?? json?.isSuccess);
+
+    return {
+      success: isSuccess,
+      httpCode,
+      data: isSuccess,
+      error: isSuccess ? undefined : 'Máy chủ từ chối hoàn thành sửa chữa',
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Mất kết nối mạng khi gửi hoàn thành sửa chữa',
     };
   }
 }

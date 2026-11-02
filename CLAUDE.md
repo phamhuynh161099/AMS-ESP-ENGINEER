@@ -72,6 +72,17 @@ Hai hệ thống notification chạy song song:
 - `GET /get-engineer-info-by?mac={mac}` — lấy thông tin kỹ sư (polled 30s)
 - `GET /checkPendingRequest/{eng_id}` — kiểm tra sự cố mới (polled 3s)
 - `POST /acknowledge` — xác nhận nhận việc (currentRequestId + macAddress)
+- `POST /complete-repair` — hoàn thành sửa chữa (currentRequestId + macAddress + machine_code + router + arrIssue)
+
+### Repair Route A/B Flow (sau khi ACKNOWLEDGED)
+
+Hiển thị trong `TicketCard` (state ACKNOWLEDGED) → `RepairFormCard`:
+- 2 nút chọn: **Route A** (Hư hỏng máy) / **Route B** (Tiện ích)
+- Route A: ô nhập mã máy (PDA hardware scan gõ trực tiếp vào TextInput, hoặc mở camera `CameraScanModal` dùng `expo-camera` built-in barcode scanner) → menu 2 cấp lỗi (fault_group → fault_l1, chọn nhiều)
+- Route B: không scan (machine_code = null) → menu 1 cấp lỗi (fault_l1, chọn nhiều)
+- Fetch danh sách lỗi: `GET /issue-machine/router-a` và `GET /issue-machine/router-b`
+- Nút HOÀN THÀNH SỬA: `completeRepair()` POST /complete-repair (endpoint riêng, tách khỏi /acknowledge) với payload: currentRequestId + macAddress + machine_code + router + arrIssue (từng item: fault_group, fault_group_code, fault_l1, fault_l1_code)
+- Form giữ **in-memory per ticket session** trong `EngineerContext` (`repairForm`) — tự clear khi ticket mới hoặc khi tuyến xác nhận xong việc
 
 ### Types — `types/engineer.ts`
 
